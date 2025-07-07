@@ -11,6 +11,10 @@ DB_HOST = os.environ.get("DB_HOST", "")
 DB_PORT = int(os.environ.get("DB_PORT", ""))
 DB_NAME = os.environ.get("DB_NAME", "")
 
+# 自定义JSON编码函数，确保中文正常显示
+def json_dumps_chinese(obj):
+    return json.dumps(obj, ensure_ascii=False)
+
 def get_connection():
     """获取数据库连接"""
     try:
@@ -157,8 +161,8 @@ def save_ai_analysis(paper_id, ai_data, language):
                     ai_data['method'],
                     ai_data['result'],
                     ai_data['conclusion'],
-                    json.dumps(ai_data['idea_en']),
-                    json.dumps(ai_data['idea_ch']),
+                    json_dumps_chinese(ai_data['idea_en']),
+                    json_dumps_chinese(ai_data['idea_ch']),
                     language,
                     datetime.now()
                 ))
@@ -176,8 +180,8 @@ def save_ai_analysis(paper_id, ai_data, language):
                     ai_data['method'],
                     ai_data['result'],
                     ai_data['conclusion'],
-                    json.dumps(ai_data['idea_en']),
-                    json.dumps(ai_data['idea_ch']),
+                    json_dumps_chinese(ai_data['idea_en']),
+                    json_dumps_chinese(ai_data['idea_ch']),
                     language,
                     paper_id
                 ))
