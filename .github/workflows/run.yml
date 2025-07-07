@@ -28,6 +28,13 @@ jobs:
         export LANGUAGE="${{ vars.LANGUAGE }}"
         export CATEGORIES="${{ vars.CATEGORIES }}"
         export MODEL_NAME="${{ vars.MODEL_NAME }}"
+        # 数据库配置
+        export SAVE_TO_DB="${{ vars.SAVE_TO_DB }}"
+        export DB_USER="${{ secrets.DB_USER }}"
+        export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+        export DB_HOST="${{ vars.DB_HOST }}"
+        export DB_PORT="${{ vars.DB_PORT }}"
+        export DB_NAME="${{ vars.DB_NAME }}"
         bash run.sh
     - name: commit
       run: |
