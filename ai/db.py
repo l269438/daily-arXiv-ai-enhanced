@@ -75,6 +75,8 @@ def init_db():
                   `method` text COLLATE utf8mb4_general_ci NOT NULL,
                   `result` text COLLATE utf8mb4_general_ci NOT NULL,
                   `conclusion` text COLLATE utf8mb4_general_ci NOT NULL,
+                  `idea_en` text COLLATE utf8mb4_general_ci NOT NULL,
+                  `idea_ch` text COLLATE utf8mb4_general_ci NOT NULL,
                   `language` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
                   `created_at` datetime NOT NULL,
                   PRIMARY KEY (`id`),
@@ -145,8 +147,8 @@ def save_ai_analysis(paper_id, ai_data, language):
             if not existing_analysis:
                 # 插入新分析
                 sql = """
-                    INSERT INTO ai_analysis (paper_id, tldr, motivation, method, result, conclusion, language, created_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    INSERT INTO ai_analysis (paper_id, tldr, motivation, method, result, conclusion, idea_en, idea_ch, language, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 """
                 cursor.execute(sql, (
                     paper_id,
@@ -155,6 +157,8 @@ def save_ai_analysis(paper_id, ai_data, language):
                     ai_data['method'],
                     ai_data['result'],
                     ai_data['conclusion'],
+                    json.dumps(ai_data['idea_en']),
+                    json.dumps(ai_data['idea_ch']),
                     language,
                     datetime.now()
                 ))
@@ -163,7 +167,7 @@ def save_ai_analysis(paper_id, ai_data, language):
                 # 更新现有分析
                 sql = """
                     UPDATE ai_analysis
-                    SET tldr = %s, motivation = %s, method = %s, result = %s, conclusion = %s, language = %s
+                    SET tldr = %s, motivation = %s, method = %s, result = %s, conclusion = %s, idea_en = %s, idea_ch = %s, language = %s
                     WHERE paper_id = %s
                 """
                 cursor.execute(sql, (
@@ -172,6 +176,8 @@ def save_ai_analysis(paper_id, ai_data, language):
                     ai_data['method'],
                     ai_data['result'],
                     ai_data['conclusion'],
+                    json.dumps(ai_data['idea_en']),
+                    json.dumps(ai_data['idea_ch']),
                     language,
                     paper_id
                 ))
