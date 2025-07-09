@@ -1,0 +1,57 @@
+name: AIGCLINK-daily-update
+
+on:
+  schedule:
+    - cron: "0 16 * * *"  # UTC 16:00，比arXiv早30分钟执行
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install dependencies
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        uv sync
+    - name: Run AIGCLINK scraper
+      run: |
+        source .venv/bin/activate
+        export DB_USER="${{ secrets.DB_USER }}"
+        export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+        export DB_HOST="${{ vars.DB_HOST }}"
+        export DB_PORT="${{ vars.DB_PORT }}"
+        export DB_NAME="${{ vars.DB_NAME }}"
+        export SAVE_TO_DB="${{ vars.SAVE_AIGCLINK_TO_DB }}"
+        # 执行AIGCLINK爬虫
+        python -m daily_arxiv.aigclink --output "data/aigclink_$(date +%Y-%m-%d).json"
+    - name: commit
+      run: |
+        git config --global user.email "${{ vars.EMAIL }}"
+        git config --global user.name "${{ vars.NAME }}"
+        git add data/aigclink_*.json
+        # 检查是否有变更需要提交
+        if git diff --staged --quiet; then
+          echo "No changes to commit"
+          exit 0
+        fi
+        git commit -m "update aigclink data"
+    - name: Pull latest changes and push
+      run: |
+        git config pull.rebase true
+        git config rebase.autoStash true
+        
+        for i in {1..3}; do
+          echo "Push attempt $i"
+          if git push origin main; then
+            echo "Push successful"
+            break
+          else
+            echo "Pull latest changes..."
+            git pull origin main --no-edit || true
+            if [ $i -eq 3 ]; then
+              echo "Failed to push after 3 attempts"
+              exit 1
+            fi
+          fi
+        done 
