@@ -23,8 +23,10 @@ jobs:
           export DB_PORT="${{ vars.DB_PORT }}"
           export DB_NAME="${{ vars.DB_NAME }}"
           export SAVE_TO_DB="${{ vars.SAVE_AIGCLINK_TO_DB }}"
-          # 执行AIGCLINK爬虫
-          python -m daily_arxiv.aigclink --output "data/aigclink_$(date +%Y-%m-%d).json"
+          # 直接执行脚本而不是作为模块导入
+          cd daily_arxiv/daily_arxiv/aigclink
+          python api_scraper.py --output "../../../data/aigclink_$(date +%Y-%m-%d).json"
+        shell: /bin/bash -e {0}
       - name: commit
         run: |
           git config --global user.email "${{ vars.EMAIL }}"

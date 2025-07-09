@@ -24,6 +24,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# 尝试导入数据库模块
+try:
+    from db import init_aigclink_table, save_aigclink_data
+    HAS_DB_MODULE = True
+except ImportError:
+    logger.warning("无法导入数据库模块，数据库功能将不可用")
+    HAS_DB_MODULE = False
+
 def call_notion_api(url=None):
     """调用Notion API获取数据"""
     if not url:
@@ -384,9 +392,9 @@ def scrape_aigclink(url=None, output_file=None, english_keys=True, save_to_db=Fa
     final_data = convert_to_english_keys(friendly_data) if english_keys else friendly_data
     
     # 5. 如果需要，保存到数据库
-    if save_to_db or os.environ.get("SAVE_TO_DB", "").lower() == "true":
+    save_to_db_env = os.environ.get("SAVE_TO_DB", "").lower() == "true"
+    if (save_to_db or save_to_db_env) and HAS_DB_MODULE:
         try:
-            from .db import init_aigclink_table, save_aigclink_data
             init_aigclink_table()
             save_aigclink_data(final_data["items"])
             logger.info(f"已将 {len(final_data['items'])} 条数据保存到数据库")
@@ -418,6 +426,7 @@ def main():
     parser.add_argument('--chinese-keys', action='store_true', help='使用中文键名（默认使用英文键名）')
     parser.add_argument('--compact', action='store_true', help='输出紧凑的JSON格式（无缩进）')
     parser.add_argument('--verbose', action='store_true', help='显示详细日志')
+    parser.add_argument('--save-to-db', action='store_true', help='将数据保存到数据库')
     
     args = parser.parse_args()
     
@@ -426,7 +435,7 @@ def main():
         logger.setLevel(logging.DEBUG)
     
     # 爬取数据
-    success = scrape_aigclink(args.url, args.output, not args.chinese_keys)
+    success = scrape_aigclink(args.url, args.output, not args.chinese_keys, args.save_to_db)
     
     return 0 if success else 1
 
