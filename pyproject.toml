@@ -17,5 +17,6 @@ dependencies = [
     "pymysql>=1.1.0",
     "feedparser>=6.0.0",  # 用于解析RSS
     "beautifulsoup4>=4.12.0",  # 用于解析HTML
+    "requests>=2.31.0",  # 用于AIGCLINK API请求
 ]
 license = "Apache-2.0"
