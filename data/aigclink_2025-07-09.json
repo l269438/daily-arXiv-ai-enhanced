@@ -1,7 +1,21 @@
 {
-  "timestamp": "2025-07-09T09:46:40.131989",
+  "timestamp": "2025-07-09T16:16:53.537419",
   "total_count": 50,
   "items": [
+    {
+      "id": "22b9857c-0f47-8053-b703-ea3bd64853a6",
+      "created_time": 1752027877877,
+      "last_edited_time": 1752056930567,
+      "tags": "MCP",
+      "summary": "微信支付MCP工具允许智能体生成付款二维码，实现扫码支付和服务提供，具备生成支付二维码、预下单ID和查询订单状态的功能。体验版已上线，正式版需申请。",
+      "url": "https://yuanqi.tencent.com/mcp-shop",
+      "category": "闭源",
+      "job_assistance": "通用",
+      "product_name": "微信支付MCP",
+      "industry": "通用",
+      "collection_date": "‣",
+      "short_description": "腾讯竟上线了微信支付MCP，意味着智能体可以挣钱了！"
+    },
     {
       "id": "22b9857c-0f47-80c1-8d73-cc04a52c55ab",
       "created_time": 1752020504797,
@@ -686,20 +700,6 @@
       "industry": "通用",
       "collection_date": "‣",
       "short_description": "OpenAI把ChatGPT的高级语音功能更新了，干了同传语音翻译软件的事儿！"
-    },
-    {
-      "id": "20b9857c-0f47-808d-bf38-d0c1d8083839",
-      "created_time": 1749290568318,
-      "last_edited_time": 1749303369165,
-      "tags": "AI agent",
-      "summary": "它有分析师、研究员、交易员、风险管理员几个智能体，综合财务数据、市场情绪、新闻报道等多个信息，智能体间进行动态讨论，进而做出全面合理的决策",
-      "url": "https://github.com/TauricResearch/TradingAgents",
-      "category": "开源",
-      "job_assistance": "通用",
-      "product_name": "TradingAgents",
-      "industry": "通用",
-      "collection_date": "‣",
-      "short_description": "一款多智能体交易系统：TradingAgents，它模拟真实的交易团队，通过分析、讨论和决策，来决定是否买卖股票"
     }
   ]
 }
