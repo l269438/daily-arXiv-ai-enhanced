@@ -24,7 +24,16 @@ logger = logging.getLogger(__name__)
 try:
     from langchain_openai import ChatOpenAI
     from langchain.prompts import ChatPromptTemplate
-    from .ai_structure import AIGCLINKAnalysis
+    # 使用绝对导入
+    try:
+        from daily_arxiv.daily_arxiv.aigclink.ai_structure import AIGCLINKAnalysis
+    except ImportError:
+        # 如果绝对导入失败，尝试相对导入
+        try:
+            from .ai_structure import AIGCLINKAnalysis
+        except ImportError:
+            # 最后尝试直接导入(在同一目录下)
+            from ai_structure import AIGCLINKAnalysis
     HAS_LANGCHAIN = True
 except ImportError:
     logger.warning("未安装langchain或langchain_openai，AI增强功能将不可用")
@@ -33,7 +42,16 @@ except ImportError:
 
 # 尝试导入数据库模块
 try:
-    from .db import save_aigclink_analysis
+    # 使用绝对导入
+    try:
+        from daily_arxiv.daily_arxiv.aigclink.db import save_aigclink_analysis
+    except ImportError:
+        # 如果绝对导入失败，尝试相对导入
+        try:
+            from .db import save_aigclink_analysis
+        except ImportError:
+            # 最后尝试直接导入(在同一目录下)
+            from db import save_aigclink_analysis
     HAS_DB_MODULE = True
 except ImportError:
     logger.warning("无法导入数据库模块，数据库功能将不可用")
@@ -85,15 +103,24 @@ def analyze_product(product_data, model_name=None):
     if not model_name:
         model_name = os.environ.get("MODEL_NAME", "gpt-4o")
     
+    # 获取API基础URL（如果有）
+    api_base = os.environ.get("OPENAI_BASE_URL", None)
+    
     logger.info(f"使用模型 {model_name} 分析产品")
     
     try:
         # 创建LLM
-        llm = ChatOpenAI(
-            model=model_name,
-            temperature=0.2,
-            api_key=api_key
-        ).with_structured_output(AIGCLINKAnalysis)
+        llm_kwargs = {
+            "model": model_name,
+            "temperature": 0.2,
+            "api_key": api_key
+        }
+        
+        # 如果设置了API基础URL，则添加到参数中
+        if api_base:
+            llm_kwargs["base_url"] = api_base
+            
+        llm = ChatOpenAI(**llm_kwargs).with_structured_output(AIGCLINKAnalysis)
         
         # 创建提示词模板
         prompt_template = ChatPromptTemplate.from_messages([
