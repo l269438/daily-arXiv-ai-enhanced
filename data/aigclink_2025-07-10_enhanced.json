@@ -701,5 +701,7 @@
       "collection_date": "‣",
       "short_description": "OpenAI把ChatGPT的高级语音功能更新了，干了同传语音翻译软件的事儿！"
     }
-  ]
+  ],
+  "enhanced": true,
+  "enhanced_timestamp": "2025-07-10T03:27:47.884378"
 }
