@@ -52,14 +52,14 @@ if os.path.exists('.env'):
 SYSTEM_PROMPT = """
 你是一位专业的AI产品分析师，擅长分析AI产品的创新点和潜在专利点。
 你的任务是分析一个AI产品的描述，并提取以下信息：
-1. 产品摘要：简要概述产品的主要功能和用途
-2. 关键特性：列出产品的主要特性和功能
-3. 创新点：分析产品的创新之处
-4. 专利点：提取可能的专利点或专利申请方向
-5. 应用场景：列出产品的主要应用场景
-6. 技术栈：推测产品可能使用的技术栈
-7. 市场潜力：分析产品的市场潜力
-8. 改进建议：提出可能的改进方向
+1. summary: 产品的简短摘要，概述其主要功能和用途
+2. key_features: 产品的关键特性，用逗号分隔
+3. innovation_points: 产品的创新点分析
+4. patent_ideas: 从产品描述中提取的可能的专利点
+5. use_cases: 产品的主要应用场景
+6. tech_stack: 推测的产品技术栈
+7. market_potential: 产品的市场潜力分析
+8. improvement_suggestions: 对产品的改进建议
 
 请确保你的分析客观、专业，并基于提供的产品描述。
 """
@@ -144,7 +144,7 @@ def main():
     if api_base:
         llm_kwargs["base_url"] = api_base
     
-    llm = ChatOpenAI(**llm_kwargs).with_structured_output(AIGCLINKAnalysis)
+    llm = ChatOpenAI(**llm_kwargs).with_structured_output(AIGCLINKAnalysis, method="function_calling")
     print('Connect to:', model_name, file=sys.stderr)
     
     # 创建提示词模板
@@ -177,9 +177,44 @@ def main():
             # 调用LLM
             print(f"开始分析产品 {idx+1}/{len(products)}: {input_data['product_name']}", file=sys.stderr)
             response = chain.invoke(input_data)
-            
-            # 将分析结果添加到产品数据
-            product['AI'] = response.model_dump()
+
+            # 处理响应
+            if use_structured:
+                # Structured output模式
+                product['AI'] = response.model_dump()
+            else:
+                # 普通模式，需要解析JSON
+                try:
+                    import json
+                    if hasattr(response, 'content'):
+                        response_text = response.content
+                    else:
+                        response_text = str(response)
+
+                    # 尝试提取JSON部分
+                    start_idx = response_text.find('{')
+                    end_idx = response_text.rfind('}') + 1
+                    if start_idx != -1 and end_idx > start_idx:
+                        json_str = response_text[start_idx:end_idx]
+                        parsed_result = json.loads(json_str)
+                        product['AI'] = parsed_result
+                    else:
+                        raise ValueError("No JSON found in response")
+
+                except (json.JSONDecodeError, ValueError) as e:
+                    print(f"解析JSON失败: {e}", file=sys.stderr)
+                    print(f"原始响应: {response_text[:200]}...", file=sys.stderr)
+                    # 创建默认结构
+                    product['AI'] = {
+                        "summary": f"解析失败: {str(e)}",
+                        "key_features": [],
+                        "innovation_points": [],
+                        "patent_ideas": [],
+                        "use_cases": [],
+                        "tech_stack": [],
+                        "market_potential": f"解析失败: {str(e)}",
+                        "improvement_suggestions": []
+                    }
             
             # 保存到数据库
             if save_to_db:
