@@ -185,7 +185,6 @@ def main():
             else:
                 # 普通模式，需要解析JSON
                 try:
-                    import json
                     if hasattr(response, 'content'):
                         response_text = response.content
                     else:
@@ -207,13 +206,13 @@ def main():
                     # 创建默认结构
                     product['AI'] = {
                         "summary": f"解析失败: {str(e)}",
-                        "key_features": [],
-                        "innovation_points": [],
-                        "patent_ideas": [],
-                        "use_cases": [],
-                        "tech_stack": [],
+                        "key_features": "解析失败",
+                        "innovation_points": "解析失败",
+                        "patent_ideas": "解析失败",
+                        "use_cases": "解析失败",
+                        "tech_stack": "解析失败",
                         "market_potential": f"解析失败: {str(e)}",
-                        "improvement_suggestions": []
+                        "improvement_suggestions": "解析失败"
                     }
             
             # 保存到数据库
@@ -227,17 +226,17 @@ def main():
                 except Exception as e:
                     print(f"保存到数据库时出错: {e}", file=sys.stderr)
                     
-        except langchain_core.exceptions.OutputParserException as e:
+        except Exception as e:
             print(f"{product.get('id', 'unknown')} 发生错误: {e}", file=sys.stderr)
             product['AI'] = {
                 "summary": "Error",
-                "key_features": [],
-                "innovation_points": [],
-                "patent_ideas": [],
-                "use_cases": [],
-                "tech_stack": [],
+                "key_features": "Error",
+                "innovation_points": "Error",
+                "patent_ideas": "Error",
+                "use_cases": "Error",
+                "tech_stack": "Error",
                 "market_potential": "Error",
-                "improvement_suggestions": []
+                "improvement_suggestions": "Error"
             }
         
         print(f"完成 {idx+1}/{len(products)}", file=sys.stderr)
