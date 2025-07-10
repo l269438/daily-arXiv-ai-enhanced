@@ -31,6 +31,39 @@ jobs:
           cd daily_arxiv/daily_arxiv/aigclink
           python api_scraper.py --output "../../../data/aigclink_$(date +%Y-%m-%d).json" --save-to-db
         shell: /bin/bash -e {0}
+      - name: Run AIGCLINK AI enhance
+        run: |
+          source .venv/bin/activate
+          # 安装额外依赖
+          pip install langchain langchain_openai
+          
+          # 设置数据库环境变量
+          export DB_USER="${{ secrets.DB_USER }}"
+          export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+          export DB_HOST="${{ vars.DB_HOST }}"
+          export DB_PORT="${{ vars.DB_PORT }}"
+          export DB_NAME="${{ vars.DB_NAME }}"
+          export SAVE_TO_DB="true"
+          # 设置OpenAI API密钥
+          export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
+          export OPENAI_BASE_URL="${{ secrets.OPENAI_BASE_URL }}"
+          export MODEL_NAME="${{ vars.MODEL_NAME }}"
+          
+          # 设置日期
+          PROCESS_DATE=$(date -u +%Y-%m-%d)
+          INPUT_FILE="data/aigclink_${PROCESS_DATE}.json"
+          OUTPUT_FILE="data/aigclink_${PROCESS_DATE}_enhanced.json"
+          
+          # 检查输入文件是否存在
+          if [ ! -f "$INPUT_FILE" ]; then
+            echo "错误: 输入文件 ${INPUT_FILE} 不存在"
+            exit 1
+          fi
+          
+          # 执行AI增强
+          cd daily_arxiv/daily_arxiv/aigclink
+          python ai_enhance.py --input "../../../${INPUT_FILE}" --output "../../../${OUTPUT_FILE}" --save-to-db
+        shell: /bin/bash -e {0}
       - name: commit
         run: |
           git config --global user.email "${{ vars.EMAIL }}"
@@ -41,7 +74,7 @@ jobs:
             echo "No changes to commit"
             exit 0
           fi
-          git commit -m "update aigclink data"
+          git commit -m "update aigclink data and analysis"
       - name: Pull latest changes and push
         run: |
           # 设置Git配置以处理自动合并
