@@ -1,4 +1,4 @@
-name: AIGCLINK-daily-update
+name: AIGCLINK-daily-ai-enhanced
 
 on:
   schedule:
@@ -14,60 +14,24 @@ jobs:
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           uv sync
-      - name: Run AIGCLINK scraper
+      - name: Run AIGCLINK complete pipeline
         run: |
           source .venv/bin/activate
-          # 安装pymysql
-          pip install pymysql
-          # 设置数据库环境变量
-          export DB_USER="${{ secrets.DB_USER }}"
-          export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
-          export DB_HOST="${{ vars.DB_HOST }}"
-          export DB_PORT="${{ vars.DB_PORT }}"
-          export DB_NAME="${{ vars.DB_NAME }}"
-          export SAVE_TO_DB="true"
-          
-          # 直接执行脚本而不是作为模块导入
-          cd daily_arxiv/daily_arxiv/aigclink
-          python api_scraper.py --output "../../../data/aigclink_$(date +%Y-%m-%d).json" --save-to-db
-        shell: /bin/bash -e {0}
-      - name: Run AIGCLINK AI enhance
-        run: |
-          source .venv/bin/activate
-          # 安装额外依赖
-          pip install langchain langchain_openai pydantic
-          
-          # 设置数据库环境变量
-          export DB_USER="${{ secrets.DB_USER }}"
-          export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
-          export DB_HOST="${{ vars.DB_HOST }}"
-          export DB_PORT="${{ vars.DB_PORT }}"
-          export DB_NAME="${{ vars.DB_NAME }}"
-          export SAVE_TO_DB="true"
-          # 设置OpenAI API密钥
+          # 设置环境变量
           export OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}"
           export OPENAI_BASE_URL="${{ secrets.OPENAI_BASE_URL }}"
           export MODEL_NAME="${{ vars.MODEL_NAME }}"
-          
-          # 设置日期
-          PROCESS_DATE=$(date -u +%Y-%m-%d)
-          INPUT_FILE="data/aigclink_${PROCESS_DATE}.json"
-          OUTPUT_FILE="data/aigclink_${PROCESS_DATE}_enhanced.json"
-          
-          # 检查输入文件是否存在
-          if [ ! -f "$INPUT_FILE" ]; then
-            echo "错误: 输入文件 ${INPUT_FILE} 不存在"
-            exit 1
-          fi
-          
-          # 复制AI结构文件到当前目录以确保可以导入
-          cp daily_arxiv/daily_arxiv/aigclink/ai_structure.py .
-          
-          # 执行AI增强
-          cd daily_arxiv/daily_arxiv/aigclink
-          # 将当前目录添加到PYTHONPATH
-          export PYTHONPATH=$PYTHONPATH:$(pwd)
-          python ai_enhance.py --input "../../../${INPUT_FILE}" --output "../../../${OUTPUT_FILE}" --save-to-db
+          export LANGUAGE="${{ vars.LANGUAGE }}"
+          # 数据库配置
+          export SAVE_TO_DB="true"
+          export DB_USER="${{ secrets.DB_USER }}"
+          export DB_PASSWORD="${{ secrets.DB_PASSWORD }}"
+          export DB_HOST="${{ vars.DB_HOST }}"
+          export DB_PORT="${{ vars.DB_PORT }}"
+          export DB_NAME="${{ vars.DB_NAME }}"
+
+          # 执行完整流程脚本
+          bash run_aigclink_complete.sh
         shell: /bin/bash -e {0}
       - name: commit
         run: |

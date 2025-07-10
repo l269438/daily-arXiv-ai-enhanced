@@ -6,56 +6,47 @@ AIGCLINK AI增强模块 - 使用LLM提取产品的专利点和创新点
 """
 
 import os
-import sys
 import json
-import logging
+import sys
 from datetime import datetime
 
-# 设置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)
+import dotenv
+import argparse
 
+import langchain_core.exceptions
+from langchain_openai import ChatOpenAI
+from langchain.prompts import (
+  ChatPromptTemplate,
+  SystemMessagePromptTemplate,
+  HumanMessagePromptTemplate,
+)
+
+# 尝试导入所需模块
 try:
-    from langchain_openai import ChatOpenAI
-    from langchain.prompts import ChatPromptTemplate
-    # 使用绝对导入
+    # 尝试从当前目录导入
     try:
-        from daily_arxiv.daily_arxiv.aigclink.ai_structure import AIGCLINKAnalysis
+        from ai_structure import AIGCLINKAnalysis
     except ImportError:
-        # 如果绝对导入失败，尝试相对导入
+        # 尝试相对导入
         try:
             from .ai_structure import AIGCLINKAnalysis
         except ImportError:
-            # 最后尝试直接导入(在同一目录下)
-            from ai_structure import AIGCLINKAnalysis
-    HAS_LANGCHAIN = True
-except ImportError:
-    logger.warning("未安装langchain或langchain_openai，AI增强功能将不可用")
-    logger.warning("安装命令: pip install langchain langchain_openai")
-    HAS_LANGCHAIN = False
+            # 尝试绝对导入
+            from daily_arxiv.daily_arxiv.aigclink.ai_structure import AIGCLINKAnalysis
 
-# 尝试导入数据库模块
-try:
-    # 使用绝对导入
     try:
-        from daily_arxiv.daily_arxiv.aigclink.db import save_aigclink_analysis
+        from db import save_aigclink_analysis, init_aigclink_table
     except ImportError:
-        # 如果绝对导入失败，尝试相对导入
         try:
-            from .db import save_aigclink_analysis
+            from .db import save_aigclink_analysis, init_aigclink_table
         except ImportError:
-            # 最后尝试直接导入(在同一目录下)
-            from db import save_aigclink_analysis
-    HAS_DB_MODULE = True
-except ImportError:
-    logger.warning("无法导入数据库模块，数据库功能将不可用")
-    HAS_DB_MODULE = False
+            from daily_arxiv.daily_arxiv.aigclink.db import save_aigclink_analysis, init_aigclink_table
+except Exception as e:
+    print(f"导入模块错误: {e}", file=sys.stderr)
+    sys.exit(1)
+
+if os.path.exists('.env'):
+    dotenv.load_dotenv()
 
 # 系统提示词
 SYSTEM_PROMPT = """
@@ -87,157 +78,149 @@ HUMAN_PROMPT = """
 请分析这个产品并提取关键信息。
 """
 
-def analyze_product(product_data, model_name=None):
-    """使用LLM分析产品数据"""
-    if not HAS_LANGCHAIN:
-        logger.error("未安装langchain，无法进行AI分析")
-        return None
-    
-    # 获取OpenAI API密钥
-    api_key = os.environ.get("OPENAI_API_KEY", "")
-    if not api_key:
-        logger.error("未设置OPENAI_API_KEY环境变量")
-        return None
-    
-    # 设置模型名称
-    if not model_name:
-        model_name = os.environ.get("MODEL_NAME", "gpt-4o")
-    
-    # 获取API基础URL（如果有）
-    api_base = os.environ.get("OPENAI_BASE_URL", None)
-    
-    logger.info(f"使用模型 {model_name} 分析产品")
-    
-    try:
-        # 创建LLM
-        llm_kwargs = {
-            "model": model_name,
-            "temperature": 0.2,
-            "api_key": api_key
-        }
-        
-        # 如果设置了API基础URL，则添加到参数中
-        if api_base:
-            llm_kwargs["base_url"] = api_base
-            
-        llm = ChatOpenAI(**llm_kwargs).with_structured_output(AIGCLINKAnalysis)
-        
-        # 创建提示词模板
-        prompt_template = ChatPromptTemplate.from_messages([
-            ("system", SYSTEM_PROMPT),
-            ("human", HUMAN_PROMPT)
-        ])
-        
-        # 创建链
-        chain = prompt_template | llm
-        
-        # 准备输入数据
-        input_data = {
-            "product_name": product_data.get("product_name", ""),
-            "short_description": product_data.get("short_description", ""),
-            "summary": product_data.get("summary", ""),
-            "category": product_data.get("category", ""),
-            "tags": ", ".join(product_data.get("tags", [])) if isinstance(product_data.get("tags"), list) else product_data.get("tags", ""),
-            "industry": product_data.get("industry", "")
-        }
-        
-        # 调用LLM
-        logger.info(f"开始分析产品: {input_data['product_name']}")
-        result = chain.invoke(input_data)
-        logger.info(f"产品分析完成: {input_data['product_name']}")
-        
-        return result
-    
-    except Exception as e:
-        logger.error(f"AI分析出错: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
+def parse_args():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(description='AIGCLINK AI增强工具')
+    parser.add_argument('--input', type=str, required=True, help='输入文件路径')
+    parser.add_argument('--output', type=str, help='输出文件路径')
+    parser.add_argument('--save-to-db', action='store_true', help='将分析结果保存到数据库')
+    return parser.parse_args()
 
-def enhance_products(products, save_to_db=False):
-    """增强产品数据"""
-    enhanced_products = []
+def main():
+    args = parse_args()
+    model_name = os.environ.get("MODEL_NAME", 'gpt-4o')
+    language = os.environ.get("LANGUAGE", 'Chinese')
+    save_to_db = args.save_to_db or os.environ.get("SAVE_TO_DB", "false").lower() == "true"
     
-    for product in products:
-        # 跳过没有产品名的项
-        if not product.get("product_name"):
-            continue
-        
-        # 分析产品
-        analysis = analyze_product(product)
-        
-        if analysis:
-            # 将分析结果添加到产品数据
-            product["AI"] = analysis.model_dump()
-            
-            # 保存到数据库
-            if save_to_db and HAS_DB_MODULE:
-                try:
-                    save_aigclink_analysis(product["id"], product["AI"])
-                    logger.info(f"产品 {product['product_name']} 的AI分析已保存到数据库")
-                except Exception as e:
-                    logger.error(f"保存AI分析到数据库失败: {e}")
-        
-        enhanced_products.append(product)
+    # 如果需要保存到数据库，初始化数据库
+    if save_to_db:
+        try:
+            init_aigclink_table()
+            print("数据库初始化成功", file=sys.stderr)
+        except Exception as e:
+            print(f"数据库初始化错误: {e}", file=sys.stderr)
+            save_to_db = False
     
-    return enhanced_products
-
-def enhance_aigclink_data(input_file, output_file=None, save_to_db=False):
-    """增强AIGCLINK数据"""
     # 读取输入文件
     try:
-        with open(input_file, 'r', encoding='utf-8') as f:
+        with open(args.input, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except Exception as e:
-        logger.error(f"读取输入文件失败: {e}")
-        return False
+        print(f"读取输入文件失败: {e}", file=sys.stderr)
+        return 1
     
     # 检查数据格式
     if not isinstance(data, dict) or "items" not in data:
-        logger.error("输入数据格式不正确")
-        return False
+        print("输入数据格式不正确", file=sys.stderr)
+        return 1
     
-    # 增强产品数据
-    enhanced_items = enhance_products(data["items"], save_to_db)
+    products = data["items"]
+    
+    # 去重
+    seen_ids = set()
+    unique_products = []
+    for item in products:
+        if item['id'] not in seen_ids:
+            seen_ids.add(item['id'])
+            unique_products.append(item)
+    
+    products = unique_products
+    
+    print('Open:', args.input, file=sys.stderr)
+    
+    # 创建LLM
+    api_key = os.environ.get("OPENAI_API_KEY", "")
+    if not api_key:
+        print("未设置OPENAI_API_KEY环境变量", file=sys.stderr)
+        return 1
+    
+    api_base = os.environ.get("OPENAI_BASE_URL", None)
+    llm_kwargs = {
+        "model": model_name,
+        "temperature": 0.2,
+        "api_key": api_key
+    }
+    
+    if api_base:
+        llm_kwargs["base_url"] = api_base
+    
+    llm = ChatOpenAI(**llm_kwargs).with_structured_output(AIGCLINKAnalysis)
+    print('Connect to:', model_name, file=sys.stderr)
+    
+    # 创建提示词模板
+    prompt_template = ChatPromptTemplate.from_messages([
+        SystemMessagePromptTemplate.from_template(SYSTEM_PROMPT),
+        HumanMessagePromptTemplate.from_template(template=HUMAN_PROMPT)
+    ])
+    
+    chain = prompt_template | llm
+    
+    # 确定输出文件
+    if not args.output:
+        output_file = args.input.replace('.json', '_enhanced.json')
+    else:
+        output_file = args.output
+    
+    # 处理每个产品
+    for idx, product in enumerate(products):
+        try:
+            # 准备输入数据
+            input_data = {
+                "product_name": product.get("product_name", ""),
+                "short_description": product.get("short_description", ""),
+                "summary": product.get("summary", ""),
+                "category": product.get("category", ""),
+                "tags": ", ".join(product.get("tags", [])) if isinstance(product.get("tags"), list) else product.get("tags", ""),
+                "industry": product.get("industry", "")
+            }
+            
+            # 调用LLM
+            print(f"开始分析产品 {idx+1}/{len(products)}: {input_data['product_name']}", file=sys.stderr)
+            response = chain.invoke(input_data)
+            
+            # 将分析结果添加到产品数据
+            product['AI'] = response.model_dump()
+            
+            # 保存到数据库
+            if save_to_db:
+                try:
+                    success = save_aigclink_analysis(product["id"], product["AI"])
+                    if success:
+                        print(f"产品 {product['id']} 已保存到数据库", file=sys.stderr)
+                    else:
+                        print(f"保存产品 {product['id']} 到数据库失败", file=sys.stderr)
+                except Exception as e:
+                    print(f"保存到数据库时出错: {e}", file=sys.stderr)
+                    
+        except langchain_core.exceptions.OutputParserException as e:
+            print(f"{product.get('id', 'unknown')} 发生错误: {e}", file=sys.stderr)
+            product['AI'] = {
+                "summary": "Error",
+                "key_features": [],
+                "innovation_points": [],
+                "patent_ideas": [],
+                "use_cases": [],
+                "tech_stack": [],
+                "market_potential": "Error",
+                "improvement_suggestions": []
+            }
+        
+        print(f"完成 {idx+1}/{len(products)}", file=sys.stderr)
     
     # 更新数据
-    data["items"] = enhanced_items
+    data["items"] = products
     data["enhanced"] = True
     data["enhanced_timestamp"] = datetime.now().isoformat()
     
     # 保存结果
-    if not output_file:
-        output_file = input_file.replace('.json', '_enhanced.json')
-    
     try:
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        logger.info(f"增强结果已保存到: {output_file}")
-        return True
+        print(f"增强结果已保存到: {output_file}", file=sys.stderr)
+        return 0
     except Exception as e:
-        logger.error(f"保存结果失败: {e}")
-        return False
-
-def main():
-    """主函数"""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description='AIGCLINK AI增强工具')
-    parser.add_argument('--input', type=str, required=True, help='输入文件路径')
-    parser.add_argument('--output', type=str, help='输出文件路径')
-    parser.add_argument('--model', type=str, help='使用的模型名称，默认使用环境变量MODEL_NAME或gpt-4o')
-    parser.add_argument('--save-to-db', action='store_true', help='将分析结果保存到数据库')
-    
-    args = parser.parse_args()
-    
-    # 设置模型名称
-    if args.model:
-        os.environ["MODEL_NAME"] = args.model
-    
-    # 增强数据
-    success = enhance_aigclink_data(args.input, args.output, args.save_to_db)
-    
-    return 0 if success else 1
+        print(f"保存结果失败: {e}", file=sys.stderr)
+        return 1
 
 if __name__ == "__main__":
     sys.exit(main()) 
